@@ -1,0 +1,27 @@
+# Ignore datasets and outputs
+*.csv
+*.tsv
+*.xlsx
+*.json
+*.parquet
+
+# Jupyter checkpoint files
+.ipynb_checkpoints/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+
+# VS Code settings (optional)
+.vscode/
+
+# System files
+.DS_Store
+Thumbs.db
