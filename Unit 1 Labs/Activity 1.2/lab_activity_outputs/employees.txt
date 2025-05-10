@@ -1,0 +1,11 @@
+Name: Alice, Age: 30, Department: HR
+Name: Bob, Age: 25, Department: Finance
+Name: Gobby, Age: 23, Department: Management
+Name: Tara, Age: 45, Department: Data Scientist
+Name: Sara, Age: 29, Department: Finance
+Name: Ali, Age: 33, Department: HR
+Name: Bobby, Age: 35, Department: Economist
+Name: Fibi, Age: 33, Department: Management
+Name: Clair, Age: 37, Department: Data Scientist
+Name: Flor, Age: 29, Department: HR
+Name: Charlie, Age: 25, Department: IT
