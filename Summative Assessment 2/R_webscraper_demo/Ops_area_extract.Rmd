@@ -1,0 +1,166 @@
+---
+title: 'Testing: area_extract()'
+author: "Dylan"
+date: "2025-04-28"
+output: html_document
+---
+
+```{r lib}
+require(rvest)
+require(dplyr)
+require(stringr)
+require(purrr)
+require(readr)
+require(ggplot2)
+require(lubridate)
+require(httr)
+```
+
+# Overall
+
+This page is just for building and testing `area_extract()`, the overall wrapper function that will automatically:
+
+1. Takes in an area name values in `df_cities`
+2. Automatically runs
+  - List page download
+  - List page parsing
+  - List page cleaning
+  - List page de-duplication
+  - Detail page url sampling
+  - Detail page download
+  
+  
+Here's a quick run down of the core extraction flow:
+
+1. `download_list_pages` -> Download the list page and cache to local directory
+2. `parse_list_page2` -> Parse the downloaded list page
+  |__ `parse_list_page_folder` -> wrapper of `parse_list_page2`, parse all downloaded list page in directory
+3. `clean_list_df` -> clean and reformat the values parsed from list page
+4. `dedupe_list` -> De-duplicate the rows from cleaned list page values
+
+Part B - Area Detail Page
+
+1. `create_url_list` -> Take the de-duped list, create a list of urls of detail pages to download
+2. `download_detail_pages` -> Takes in a vector of urls and download the pages to local directory
+3. `parse_detail_page` -> Parse the downloaded detail page
+  |__ `parse_detail_page_folder` -> wrapper of `parse_detail_page`, parse all downloaded detail page in directory
+4. `clean_detail_df` -> clean and reformat the values parsed from detail page
+5. `join_results` -> Combine the data from list pages and detail pages, drop redundant columns
+
+
+
+# Getting the summary page info
+
+```{r sub_admin}
+df_cities <- read_csv("data/tokyo_wards_and_cities_codes.csv") %>%
+  mutate(
+    area_code = str_extract(page_url, "(?<=sc=)\\d{5}")
+  ) %>%
+  arrange(area_code)
+
+```
+
+```{r get_sub_admin_info, cache=TRUE}
+hs <- "helper_scripts"
+source(file.path(hs, "get_area_page_info.R"))
+
+start_time <- Sys.time()
+df_cities_info <- get_area_page_info(data = df_cities)
+Sys.time() - start_time
+```
+
+
+```{r}
+df_cities_info
+```
+
+
+# Extracting Station
+
+
+Choose the areas to extract:
+
+```{r}
+area_pool <- df_cities %>% #filter(region_en %in% c("Toka")) %>% 
+  select(names_en) %>% pull()
+
+message("The Pool: ")
+area_pool
+
+message("\n The choice: ")
+area_to_extract <- area_pool
+area_to_extract
+
+
+```
+
+Processing time estimate
+
+```{r est_time}
+source("helper_scripts/estimate_process_time.R")
+
+sample_levels <- c(0.1, 0.25, 0.5, 0.75, 1.0)
+
+est_time <- estimate_process_time(select_area = area_to_extract,
+                      updated_area_info = df_cities_info,
+                      sample_parts = sample_levels)
+```
+
+```{r est_time}
+est_time$detail_table
+est_time$sample_parts_time/60
+
+est_complete_time <- Sys.time() + est_time$sample_parts_time['0.1']*60
+message(paste0("Est. Complete Time at 10% Sample Level: \n ---", est_complete_time))
+```
+
+
+
+Take vector of English area names and run the `area_extract()`
+
+```{r, warning=FALSE}
+source("helper_scripts/area_extract.R")
+area_extract(area_name = area_to_extract,
+             overwrite = TRUE, timeout_sec = 5,
+             full_process = TRUE,
+             sample_part = 0.1, seed = 445856,
+             hide_success = TRUE, read_line_notice = 100,
+             clean_cache = TRUE, clean_nday_old = NULL,
+             run_dt_page_section = TRUE)
+```
+
+
+
+
+# Read Extraction Master
+
+```{r}
+df_master_log <- read_csv("extraction_job_master_log.csv", show_col_types = FALSE) %>% 
+  mutate(
+    start_time = with_tz(start_time, tzone = "Asia/Tokyo"),
+    end_time = with_tz(end_time, tzone = "Asia/Tokyo")
+  )
+```
+
+
+What have we extracted
+
+
+```{r}
+temp <- df_master_log %>% filter(sample_part == 0.25) %>% mutate(area_code = as.character(area_code)) %>%
+  select(start_time, area_code, area_name, n_listing_after_deduped, n_detail_success, job_id) %>%
+  group_by(area_code) %>%
+  slice_max(order_by = start_time)
+
+quick_area_check <- df_cities_info %>% select(names_jp:area_code, max_page) %>%
+  mutate(area_code = as.character(area_code)) %>%
+  left_join(temp, by = join_by(area_code, names_en == area_name))
+
+
+```
+
+
+
+
+
+
